@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="es">
 <head>
 <meta charset="UTF-8">
@@ -67,6 +66,10 @@
   .fig-cant{font-family:'Bebas Neue',cursive;font-size:.75rem;color:#7c3aed;position:absolute;bottom:4px;right:5px;line-height:1}
   .btn-eliminar{position:absolute;top:-7px;left:-7px;width:20px;height:20px;background:var(--rojo);color:#fff;border:2px solid #0f2617;border-radius:50%;font-size:.6rem;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;z-index:5;box-shadow:0 2px 6px rgba(0,0,0,.5);line-height:1}
   .btn-eliminar:hover{background:#b02020;transform:scale(1.1)}
+  .btn-menos{position:absolute;top:-7px;right:-7px;width:20px;height:20px;background:#f5c842;color:#333;border:2px solid #0f2617;border-radius:50%;font-size:.9rem;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;z-index:5;box-shadow:0 2px 6px rgba(0,0,0,.5);line-height:1}
+  .btn-menos:hover{background:#e0b030;transform:scale(1.1)}
+  .figurita:hover .btn-menos{opacity:1}
+  @media(max-width:480px){.btn-eliminar{opacity:1}.btn-menos{opacity:1}}
   .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:100;align-items:center;justify-content:center;padding:20px}
   .overlay.visible{display:flex}
   .modal{background:#1c3d2a;border:2px solid var(--dorado);border-radius:12px;padding:28px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.7);animation:slideUp .2s ease}
@@ -148,7 +151,6 @@
 </div>
 
 <!-- MODAL ALBUM -->
-
 <div class="overlay" id="overlay">
   <div class="modal">
     <h2>+ Agregar Figuritas</h2>
@@ -170,13 +172,11 @@
 </div>
 
 <!-- MODAL REPETIDA -->
-
 <div class="overlay" id="overlay-rep">
   <div class="modal modal-rep">
     <h2>Agregar Repetida</h2>
-    <div class="campo"><label>Numero / Codigo</label><input type="text" id="r-num" placeholder="Ej: MEX 10"></div>
-    <div class="campo"><label>Nombre (opcional)</label><input type="text" id="r-nombre" placeholder="Ej: Messi"></div>
-    <div class="campo"><label>Cantidad</label><input type="number" id="r-cant" value="1" min="1" max="20"></div>
+    <div class="campo"><label>Numeros (separados por coma, espacio o guion)</label><input type="text" id="r-num" placeholder="Ej: MEX 10, ARG 17 - BRA 5"></div>
+    <div class="campo"><label>Cantidad por cada una</label><input type="number" id="r-cant" value="1" min="1" max="20"></div>
     <div class="modal-btns">
       <button class="btn-accion btn-gris" onclick="cerrarModalRep()">Cancelar</button>
       <button class="btn-accion btn-violeta" onclick="agregarRepetida()">Guardar</button>
@@ -185,7 +185,6 @@
 </div>
 
 <!-- MODAL CONFIRMAR -->
-
 <div class="overlay" id="overlay-confirm">
   <div class="modal confirm-modal">
     <h2>Eliminar</h2>
@@ -199,7 +198,6 @@
 </div>
 
 <!-- MODAL EXPORTAR -->
-
 <div class="overlay" id="overlay-exportar">
   <div class="modal">
     <h2>Exportar Datos</h2>
@@ -213,7 +211,6 @@
 </div>
 
 <!-- MODAL IMPORTAR -->
-
 <div class="overlay" id="overlay-importar">
   <div class="modal">
     <h2>Importar Datos</h2>
@@ -896,8 +893,11 @@ function renderRepetidas(){
   panel.appendChild(secDiv);var grid=secDiv.querySelector('.grid');
   reps.forEach(function(rep){
     var div=document.createElement('div');div.className='figurita '+(rep.dada?'rep-dada':'rep-pend');
-    div.innerHTML='<button class="btn-eliminar">x</button><div class="fig-numero">'+rep.n+'</div><div class="fig-nombre">'+rep.t+'</div>'+(rep.cant>1?'<div class="fig-cant">x'+rep.cant+'</div>':'');
+    var cantBadge=rep.cant>1?'<div class="fig-cant">x'+rep.cant+'</div>':'';
+    var btnMenos=rep.cant>1?'<button class="btn-menos" title="Restar una">-</button>':'';
+    div.innerHTML='<button class="btn-eliminar">x</button>'+btnMenos+'<div class="fig-numero">'+rep.n+'</div><div class="fig-nombre">'+rep.t+'</div>'+cantBadge;
     div.querySelector('.btn-eliminar').addEventListener('click',function(e){e.stopPropagation();pedirConfirmacion('rep',null,rep.n,rep.t);});
+    if(rep.cant>1){div.querySelector('.btn-menos').addEventListener('click',function(e){e.stopPropagation();restarRepetida(rep.n);});}
     div.addEventListener('click',function(){toggleRepetida(rep.n);});
     grid.appendChild(div);
   });
@@ -921,8 +921,31 @@ function toggleAlbum(secNombre,num){
 
 function toggleRepetida(num){
   var rep=estado.repetidas.find(function(r){return r.n===num;});
-  if(!rep)return;rep.dada=!rep.dada;guardarDatos();render();
-  mostrarToast(rep.dada?'Cambiada: '+num:'Sin cambiar: '+num);
+  if(!rep)return;
+  if(!rep.dada){
+    // Marcar como cambiada
+    rep.dada=true;
+    mostrarToast('Cambiada: '+num);
+  } else {
+    // Ya estaba cambiada, desmarcar
+    rep.dada=false;
+    mostrarToast('Sin cambiar: '+num);
+  }
+  guardarDatos();render();
+}
+function restarRepetida(num){
+  var rep=estado.repetidas.find(function(r){return r.n===num;});
+  if(!rep)return;
+  if(rep.cant>1){
+    rep.cant--;
+    guardarDatos();render();
+    mostrarToast(num+' ahora x'+rep.cant);
+  } else {
+    // Solo queda 1, eliminar directamente
+    estado.repetidas=estado.repetidas.filter(function(r){return r.n!==num;});
+    guardarDatos();render();
+    mostrarToast(num+' eliminada de repetidas');
+  }
 }
 
 function eliminarDadas(){
@@ -961,7 +984,9 @@ function cerrarModal(){
   document.getElementById('m-preview').style.display='none';
 }
 function parsearNums(raw){
-  return raw.split(/[,\s]+/).map(function(x){return x.trim().toUpperCase();}).filter(function(x){return x.length>0;});
+  // Separar solo por coma o guion medio, NO por espacios
+  // Asi "ARG 1, ARG 2" -> ["ARG 1","ARG 2"] y "ARG 1" -> ["ARG 1"]
+  return raw.split(/[,\-]+/).map(function(x){return x.trim().toUpperCase();}).filter(function(x){return x.length>0;});
 }
 function previsualizarFigs(){
   var secNombre=document.getElementById('m-seccion').value.trim()||'General';
@@ -977,7 +1002,7 @@ function previsualizarFigs(){
   prev.textContent=lineas.join('\n');
 }
 function agregarFiguritas(){
-  var secNombre=document.getElementById('m-seccion').value.trim()||'General';
+  var secNombre=(document.getElementById('m-seccion').value.trim()||'General').toUpperCase();
   var nums=parsearNums(document.getElementById('m-nums').value);
   if(!nums.length){mostrarToast('Ingresa al menos un numero');return;}
   // Buscar seccion existente case-insensitive
@@ -1002,16 +1027,23 @@ document.getElementById('m-seccion').addEventListener('input',previsualizarFigs)
 document.getElementById('m-nums').addEventListener('keydown',function(e){if(e.key==='Enter')agregarFiguritas();});
 
 function abrirModalRep(){document.getElementById('overlay-rep').classList.add('visible');setTimeout(function(){document.getElementById('r-num').focus();},50);}
-function cerrarModalRep(){document.getElementById('overlay-rep').classList.remove('visible');['r-num','r-nombre'].forEach(function(id){document.getElementById(id).value='';});document.getElementById('r-cant').value='1';}
+function cerrarModalRep(){document.getElementById('overlay-rep').classList.remove('visible');document.getElementById('r-num').value='';document.getElementById('r-cant').value='1';}
 function agregarRepetida(){
-  var num=document.getElementById('r-num').value.trim().toUpperCase();
-  var nombre=document.getElementById('r-nombre').value.trim();
+  var rawNums=document.getElementById('r-num').value.trim();
   var cant=parseInt(document.getElementById('r-cant').value)||1;
-  if(!num){mostrarToast('Ingresa un numero');return;}
-  var existe=estado.repetidas.find(function(r){return r.n===num;});
-  if(existe){existe.cant+=cant;guardarDatos();cerrarModalRep();render();mostrarToast(num+' ahora x'+existe.cant);return;}
-  estado.repetidas.push({n:num,t:nombre,cant:cant,dada:false});
-  guardarDatos();cerrarModalRep();render();mostrarToast('Repetida agregada: '+num+' x'+cant);
+  if(!rawNums){mostrarToast('Ingresa al menos un numero');return;}
+  var nums=rawNums.split(/[,\-]+/).map(function(x){return x.trim().toUpperCase();}).filter(function(x){return x.length>0;});
+  var agregadas=0,actualizadas=0;
+  nums.forEach(function(num){
+    var existe=estado.repetidas.find(function(r){return r.n===num;});
+    if(existe){existe.cant+=cant;actualizadas++;}
+    else{estado.repetidas.push({n:num,t:'',cant:cant,dada:false});agregadas++;}
+  });
+  guardarDatos();cerrarModalRep();render();
+  var msg='';
+  if(agregadas)msg+=agregadas+' repetida(s) agregada(s)';
+  if(actualizadas)msg+=(msg?' + ':'')+actualizadas+' actualizada(s)';
+  mostrarToast(msg);
 }
 document.getElementById('overlay-rep').addEventListener('click',function(e){if(e.target===document.getElementById('overlay-rep'))cerrarModalRep();});
 document.querySelectorAll('#overlay-rep input').forEach(function(inp){inp.addEventListener('keydown',function(e){if(e.key==='Enter')agregarRepetida();});});
@@ -1043,6 +1075,5 @@ function mostrarToast(msg){var t=document.getElementById('toast');t.textContent=
 
 render();
 </script>
-
 </body>
 </html>
