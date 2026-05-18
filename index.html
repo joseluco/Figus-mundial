@@ -130,6 +130,7 @@
     <button class="filtro" onclick="setFiltro(this,'tengo')">Tengo</button>
   </div>
   <button class="btn-accion btn-dorado" onclick="abrirModal()">+ Agregar</button>
+  <button class="btn-accion btn-verde" onclick="abrirCompartir()">&#128288; Compartir</button>
   <button class="btn-accion btn-azul" onclick="exportarDatos()">&#8595; Exportar</button>
   <button class="btn-accion btn-azul" onclick="abrirImportar()">&#8593; Importar</button>
 </div>
@@ -219,6 +220,30 @@
     <div class="modal-btns">
       <button class="btn-accion btn-gris" onclick="cerrarImportar()">Cancelar</button>
       <button class="btn-accion btn-verde" onclick="importarDatos()">Importar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL COMPARTIR -->
+<div class="overlay" id="overlay-compartir">
+  <div class="modal">
+    <h2>&#128288; Compartir</h2>
+    <p class="modal-desc">Que queres enviar?</p>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px">
+      <button class="btn-accion btn-rojo" style="padding:11px;font-size:.82rem" onclick="prepararTexto('faltan')">&#10060; Las que me FALTAN</button>
+      <button class="btn-accion btn-violeta" style="padding:11px;font-size:.82rem" onclick="prepararTexto('repetidas')">&#128257; Mis REPETIDAS</button>
+      <button class="btn-accion btn-azul" style="padding:11px;font-size:.82rem" onclick="prepararTexto('todo')">&#128203; Faltan + Repetidas</button>
+    </div>
+    <div id="preview-compartir" style="display:none">
+      <p class="modal-desc" style="margin-bottom:8px">Texto listo. Como queres enviarlo?</p>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <button class="btn-accion btn-verde" style="padding:13px;font-size:.9rem;background:#25D366;letter-spacing:1px" onclick="copiarTextoCompartir()">&#128203; COPIAR TEXTO</button>
+        <p style="text-align:center;font-size:.72rem;color:rgba(255,255,255,.4);font-family:Barlow Condensed,sans-serif;letter-spacing:1px">Despues pega en WhatsApp</p>
+      </div>
+      <div id="texto-preview" style="margin-top:10px;background:rgba(0,0,0,.3);border-radius:6px;padding:10px;font-size:.7rem;color:rgba(255,255,255,.5);max-height:100px;overflow-y:auto;white-space:pre-wrap;font-family:monospace"></div>
+    </div>
+    <div class="modal-btns" style="margin-top:12px">
+      <button class="btn-accion btn-gris" onclick="cerrarCompartir()">Cerrar</button>
     </div>
   </div>
 </div>
@@ -1070,6 +1095,103 @@ function importarDatos(){
 }
 document.getElementById('overlay-importar').addEventListener('click',function(e){if(e.target===document.getElementById('overlay-importar'))cerrarImportar();});
 
+// COMPARTIR
+var textoCompartirActual='';
+
+function abrirCompartir(){
+  document.getElementById('overlay-compartir').classList.add('visible');
+  document.getElementById('preview-compartir').style.display='none';
+  document.getElementById('texto-preview').textContent='';
+}
+function cerrarCompartir(){
+  document.getElementById('overlay-compartir').classList.remove('visible');
+  textoCompartirActual='';
+}
+function generarTexto(modo){
+  var lineas=[];
+  var fecha=new Date().toLocaleDateString('es-AR');
+  // FALTAN
+  if(modo==='todo'||modo==='faltan'){
+    lineas.push('FIGURITAS QUE ME FALTAN');
+    lineas.push('Mundial 2026 - '+fecha);
+    lineas.push('');
+    var hayFaltan=false;
+    estado.secciones.forEach(function(sec){
+      var figs=sec.figs.filter(function(f){return!f.tengo;});
+      if(!figs.length)return;
+      hayFaltan=true;
+      lineas.push('['+sec.nombre+']');
+      lineas.push(figs.map(function(f){return f.n;}).join(', '));
+      lineas.push('');
+    });
+    if(!hayFaltan){lineas.push('No me falta ninguna!');lineas.push('');}
+  }
+  if(modo==='todo'){lineas.push('---');lineas.push('');}
+  // REPETIDAS
+  if(modo==='todo'||modo==='repetidas'){
+    lineas.push('FIGURITAS REPETIDAS');
+    if(modo==='repetidas'){lineas.push('Mundial 2026 - '+fecha);}
+    lineas.push('');
+    if(!estado.repetidas||!estado.repetidas.length){
+      lineas.push('No tengo repetidas');
+      lineas.push('');
+    } else {
+      estado.repetidas.forEach(function(r){
+        lineas.push(r.n);
+      });
+      lineas.push('');
+    }
+  }
+  return lineas.join('\n');
+}
+function prepararTexto(modo){
+  textoCompartirActual=generarTexto(modo);
+  document.getElementById('texto-preview').textContent=textoCompartirActual;
+  document.getElementById('preview-compartir').style.display='block';
+}
+// enviarWhatsapp eliminado - se usa solo copiar
+function copiarTextoCompartir(){
+  if(!textoCompartirActual)return;
+  try{
+    navigator.clipboard.writeText(textoCompartirActual).then(function(){
+      mostrarToast('Texto copiado! Pega en WhatsApp');
+      cerrarCompartir();
+    }).catch(function(){copiarFallback();});
+  }catch(e){copiarFallback();}
+}
+function copiarFallback(){
+  var el=document.createElement('textarea');
+  el.value=textoCompartirActual;
+  el.setAttribute('readonly','');
+  el.style.cssText='position:fixed;top:0;left:0;width:2em;height:2em;opacity:0;';
+  document.body.appendChild(el);
+  // iOS necesita setSelectionRange
+  if(navigator.userAgent.match(/ipad|iphone/i)){
+    el.contentEditable=true;el.readOnly=false;
+    var range=document.createRange();
+    range.selectNodeContents(el);
+    var sel=window.getSelection();
+    sel.removeAllRanges();sel.addRange(range);
+    el.setSelectionRange(0,999999);
+  } else {
+    el.select();
+  }
+  try{
+    var ok=document.execCommand('copy');
+    if(ok){
+      mostrarToast('Copiado! Ahora pega en WhatsApp');
+      cerrarCompartir();
+    } else {
+      mostrarToast('No se pudo copiar. Selecciona el texto manualmente');
+    }
+  }catch(e){
+    mostrarToast('No se pudo copiar. Selecciona el texto manualmente');
+  }
+  document.body.removeChild(el);
+}
+document.getElementById('overlay-compartir').addEventListener('click',function(e){
+  if(e.target===document.getElementById('overlay-compartir'))cerrarCompartir();
+});
 var toastTimer;
 function mostrarToast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.classList.remove('show');},2400);}
 
