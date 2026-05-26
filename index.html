@@ -131,6 +131,7 @@
   </div>
   <button class="btn-accion btn-dorado" onclick="abrirModal()">+ Agregar</button>
   <button class="btn-accion btn-verde" onclick="abrirCompartir()">&#128288; Compartir</button>
+  <button class="btn-accion" style="background:#e67e22;color:#fff" onclick="abrirComparar()">&#128260; Comparar</button>
   <button class="btn-accion btn-azul" onclick="exportarDatos()">&#8595; Exportar</button>
   <button class="btn-accion btn-azul" onclick="abrirImportar()">&#8593; Importar</button>
 </div>
@@ -220,6 +221,30 @@
     <div class="modal-btns">
       <button class="btn-accion btn-gris" onclick="cerrarImportar()">Cancelar</button>
       <button class="btn-accion btn-verde" onclick="importarDatos()">Importar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL COMPARAR -->
+<div class="overlay" id="overlay-comparar">
+  <div class="modal">
+    <h2>&#128260; Comparar</h2>
+    <div id="comparar-paso1">
+      <p class="modal-desc">Pega el texto que te mandaron (sus faltantes y/o repetidas):</p>
+      <div class="campo">
+        <textarea id="comparar-texto" rows="6" placeholder="Pega aca el texto recibido..."></textarea>
+      </div>
+      <div class="modal-btns">
+        <button class="btn-accion btn-gris" onclick="cerrarComparar()">Cancelar</button>
+        <button class="btn-accion" style="background:#e67e22;color:#fff;flex:1;padding:10px" onclick="procesarComparacion()">&#128260; Comparar</button>
+      </div>
+    </div>
+    <div id="comparar-resultado" style="display:none">
+      <div id="comparar-contenido"></div>
+      <div class="modal-btns" style="margin-top:14px">
+        <button class="btn-accion btn-gris" onclick="volverComparar()">&#8592; Volver</button>
+        <button class="btn-accion btn-verde" style="flex:1;padding:10px" onclick="copiarResultado()">&#128203; Copiar resultado</button>
+      </div>
     </div>
   </div>
 </div>
@@ -905,26 +930,54 @@ var mb=busqueda===''
 function renderRepetidas(){
   var panel=document.getElementById('panel-repetidas');panel.innerHTML='';
   var reps=estado.repetidas.filter(function(r){
-  var rPrefix=String(r.n).split(' ')[0].toLowerCase();
-  return busquedaRep===''
-    ||String(r.n).toLowerCase().includes(busquedaRep)
-    ||r.t.toLowerCase().includes(busquedaRep)
-    ||rPrefix===busquedaRep
-    ||rPrefix.includes(busquedaRep);
-});
-  if(!reps.length){panel.innerHTML='<div class="empty">Sin repetidas cargadas<br><span style="color:#a78bfa;font-size:.85rem">Usa + Agregar repetida</span></div>';return;}
-  var secDiv=document.createElement('div');secDiv.className='seccion';
-  secDiv.innerHTML='<div class="seccion-titulo rep">Mis Repetidas<span class="seccion-count rep">'+reps.length+' fig.</span></div><div class="grid"></div>';
-  panel.appendChild(secDiv);var grid=secDiv.querySelector('.grid');
-  reps.forEach(function(rep){
-    var div=document.createElement('div');div.className='figurita '+(rep.dada?'rep-dada':'rep-pend');
-    var cantBadge=rep.cant>1?'<div class="fig-cant">x'+rep.cant+'</div>':'';
-    var btnMenos=rep.cant>1?'<button class="btn-menos" title="Restar una">-</button>':'';
-    div.innerHTML='<button class="btn-eliminar">x</button>'+btnMenos+'<div class="fig-numero">'+rep.n+'</div><div class="fig-nombre">'+rep.t+'</div>'+cantBadge;
-    div.querySelector('.btn-eliminar').addEventListener('click',function(e){e.stopPropagation();pedirConfirmacion('rep',null,rep.n,rep.t);});
-    if(rep.cant>1){div.querySelector('.btn-menos').addEventListener('click',function(e){e.stopPropagation();restarRepetida(rep.n);});}
-    div.addEventListener('click',function(){toggleRepetida(rep.n);});
-    grid.appendChild(div);
+    return busquedaRep===''||String(r.n).toLowerCase().includes(busquedaRep)||r.t.toLowerCase().includes(busquedaRep);
+  });
+  if(!reps.length){
+    panel.innerHTML='<div class="empty">Sin repetidas cargadas<br><span style="color:#a78bfa;font-size:.85rem">Usa + Agregar repetida</span></div>';
+    return;
+  }
+  // Agrupar por seccion en el mismo orden del album
+  var grupos={};
+  var orden=[];
+  estado.secciones.forEach(function(sec){
+    var prefijosSeccion=[...new Set(sec.figs.map(function(f){return f.n.split(' ')[0].toUpperCase();}))];
+    reps.forEach(function(r){
+      var prefijo=r.n.split(' ')[0].toUpperCase();
+      var enSeccion=sec.figs.some(function(f){return f.n.toUpperCase()===r.n.toUpperCase();})||prefijosSeccion.indexOf(prefijo)!==-1;
+      if(enSeccion){
+        if(!grupos[sec.nombre]){grupos[sec.nombre]=[];orden.push(sec.nombre);}
+        if(!grupos[sec.nombre].some(function(x){return x.n===r.n;}))grupos[sec.nombre].push(r);
+      }
+    });
+  });
+  // Las que no matchean ninguna seccion
+  reps.forEach(function(r){
+    var ya=Object.keys(grupos).some(function(k){return grupos[k].some(function(x){return x.n===r.n;});});
+    if(!ya){if(!grupos['Otras']){grupos['Otras']=[];orden.push('Otras');}grupos['Otras'].push(r);}
+  });
+  // Titulo general
+  var tot=reps.length;
+  var h=document.createElement('div');
+  h.innerHTML='<div class="seccion-titulo rep" style="margin-bottom:16px">Mis Repetidas<span class="seccion-count rep">'+tot+' fig.</span></div>';
+  panel.appendChild(h);
+  // Renderizar por seccion
+  orden.forEach(function(secNombre){
+    var figsGrupo=grupos[secNombre];
+    if(!figsGrupo||!figsGrupo.length)return;
+    var secDiv=document.createElement('div');secDiv.className='seccion';
+    secDiv.innerHTML='<div class="seccion-titulo rep" style="font-size:1rem;letter-spacing:2px">'+secNombre+'<span class="seccion-count rep">'+figsGrupo.length+'</span></div><div class="grid"></div>';
+    panel.appendChild(secDiv);
+    var grid=secDiv.querySelector('.grid');
+    figsGrupo.forEach(function(rep){
+      var div=document.createElement('div');div.className='figurita '+(rep.dada?'rep-dada':'rep-pend');
+      var cantBadge=rep.cant>1?'<div class="fig-cant">x'+rep.cant+'</div>':'';
+      var btnMenos=rep.cant>1?'<button class="btn-menos" title="Restar una">-</button>':'';
+      div.innerHTML='<button class="btn-eliminar">x</button>'+btnMenos+'<div class="fig-numero">'+rep.n+'</div><div class="fig-nombre">'+rep.t+'</div>'+cantBadge;
+      div.querySelector('.btn-eliminar').addEventListener('click',function(e){e.stopPropagation();pedirConfirmacion('rep',null,rep.n,rep.t);});
+      if(rep.cant>1){div.querySelector('.btn-menos').addEventListener('click',function(e){e.stopPropagation();restarRepetida(rep.n);});}
+      div.addEventListener('click',function(){toggleRepetida(rep.n);});
+      grid.appendChild(div);
+    });
   });
 }
 
@@ -974,10 +1027,18 @@ function restarRepetida(num){
 }
 
 function eliminarDadas(){
-  var antes=estado.repetidas.length;
-  estado.repetidas=estado.repetidas.filter(function(r){return!r.dada;});
-  var el=antes-estado.repetidas.length;guardarDatos();render();
-  mostrarToast(el>0?el+' repetida(s) eliminada(s)':'No hay cambiadas para eliminar');
+  var restadas=0;
+  estado.repetidas.forEach(function(r){
+    if(r.dada){
+      r.cant--;   // restar 1
+      r.dada=false; // desmarcar para la proxima
+      restadas++;
+    }
+  });
+  // Borrar las que llegaron a 0
+  estado.repetidas=estado.repetidas.filter(function(r){return r.cant>0;});
+  guardarDatos();render();
+  mostrarToast(restadas>0?restadas+' repetida(s) restada(s)':'No hay cambiadas para eliminar');
 }
 
 var pendienteEliminar=null;
@@ -1094,6 +1155,229 @@ function importarDatos(){
   catch(e){mostrarToast('Codigo invalido');}
 }
 document.getElementById('overlay-importar').addEventListener('click',function(e){if(e.target===document.getElementById('overlay-importar'))cerrarImportar();});
+
+// COMPARAR
+function abrirComparar(){
+  document.getElementById('overlay-comparar').classList.add('visible');
+  document.getElementById('comparar-paso1').style.display='block';
+  document.getElementById('comparar-resultado').style.display='none';
+  document.getElementById('comparar-texto').value='';
+}
+function cerrarComparar(){
+  document.getElementById('overlay-comparar').classList.remove('visible');
+}
+function volverComparar(){
+  document.getElementById('comparar-paso1').style.display='block';
+  document.getElementById('comparar-resultado').style.display='none';
+}
+document.getElementById('overlay-comparar').addEventListener('click',function(e){
+  if(e.target===document.getElementById('overlay-comparar'))cerrarComparar();
+});
+
+// Limpiar emojis y caracteres especiales de un string
+function limpiarEmojis(str){
+  // Remover emojis y caracteres no ASCII excepto letras, números, espacios, coma, guión
+  return str.replace(/[\u{1F000}-\u{1FFFF}]/gu,'')
+            .replace(/[\u{2600}-\u{27FF}]/gu,'')
+            .replace(/[\u{1F300}-\u{1F9FF}]/gu,'')
+            .replace(/[\uD800-\uDFFF]/g,'')  // surrogate pairs (banderas)
+            .replace(/[^\x00-\x7F]/g,'')     // cualquier no-ASCII restante
+            .trim();
+}
+
+// Parsear texto recibido en formato "PAIS emoji: num1, num2, num3"
+// o formato propio "[PAIS]\nnum1, num2"
+function extraerCodigos(texto){
+  var codigos=[];
+  var lineas=texto.split('\n');
+  var seccionActual=null;
+
+  lineas.forEach(function(linea){
+    var lineaLimpia=limpiarEmojis(linea).trim();
+    if(!lineaLimpia)return;
+
+    // Ignorar encabezados conocidos
+    var upper=lineaLimpia.toUpperCase();
+    if(upper.indexOf('FIGURITAS')!==-1||upper.indexOf('MUNDIAL')!==-1||
+       upper.indexOf('REPETIDAS')!==-1||upper.indexOf('FALTAN')!==-1||
+       upper.indexOf('LISTA')!==-1||upper.indexOf('USA')!==-1||
+       upper==='---'||upper.startsWith('ME PUEDE')||upper.startsWith('YO LE'))return;
+
+    // Detectar línea de sección: "PAIS: num1, num2" o "PAIS : num1, num2"
+    var matchSeccion=lineaLimpia.match(/^([A-Z]{2,5})\s*:\s*(.+)$/i);
+    if(matchSeccion){
+      var pais=matchSeccion[1].trim().toUpperCase();
+      var nums=matchSeccion[2];
+      // Extraer números y construir códigos completos
+      nums.split(',').forEach(function(n){
+        var num=n.trim();
+        if(num&&!isNaN(num)){
+          codigos.push(pais+' '+num);
+        }
+      });
+      seccionActual=pais;
+      return;
+    }
+
+    // Línea tipo "[PAIS]" (nuestro formato)
+    var matchBracket=lineaLimpia.match(/^\[([^\]]+)\]$/);
+    if(matchBracket){
+      seccionActual=matchBracket[1].trim().toUpperCase();
+      return;
+    }
+
+    // Línea solo de números (pertenece a sección anterior)
+    if(seccionActual){
+      var soloNums=lineaLimpia.replace(/[^0-9,\s]/g,'').trim();
+      if(soloNums){
+        soloNums.split(',').forEach(function(n){
+          var num=n.trim();
+          if(num&&!isNaN(num)){
+            codigos.push(seccionActual+' '+num);
+          }
+        });
+      }
+    }
+  });
+
+  return codigos;
+}
+
+var textoResultado='';
+
+function procesarComparacion(){
+  var textoOtro=document.getElementById('comparar-texto').value.trim();
+  if(!textoOtro){mostrarToast('Pega primero el texto recibido');return;}
+
+  // Extraer todos los códigos del texto recibido
+  var codigosOtro=extraerCodigos(textoOtro);
+
+  // Mis repetidas (códigos)
+  var misRepetidas=estado.repetidas.map(function(r){return r.n.toUpperCase();});
+
+  // Mis faltantes (códigos)
+  var misFaltantes=[];
+  estado.secciones.forEach(function(sec){
+    sec.figs.filter(function(f){return!f.tengo;}).forEach(function(f){
+      misFaltantes.push(f.n.toUpperCase());
+    });
+  });
+
+  // CRUCE 1: Mis repetidas que están en los códigos del otro
+  // (le puedo dar)
+  var puedoDar=misRepetidas.filter(function(n){
+    return codigosOtro.indexOf(n)!==-1;
+  });
+
+  // CRUCE 2: Códigos del otro que están en mis faltantes
+  // (me puede dar)
+  var puedoRecibir=codigosOtro.filter(function(n){
+    return misFaltantes.indexOf(n)!==-1;
+  });
+
+  // Agrupar por sección
+  function agruparPorSeccion(codigos){
+    var grupos={};
+    codigos.forEach(function(cod){
+      // Buscar la sección en el estado
+      var secNombre=null;
+      estado.secciones.forEach(function(sec){
+        sec.figs.forEach(function(f){
+          if(f.n.toUpperCase()===cod)secNombre=sec.nombre;
+        });
+      });
+      // Si no está en el estado, extraer prefijo del código
+      if(!secNombre){
+        var partes=cod.split(' ');
+        secNombre=partes.length>1?partes[0]:cod;
+      }
+      if(!grupos[secNombre])grupos[secNombre]=[];
+      grupos[secNombre].push(cod);
+    });
+    return grupos;
+  }
+
+  var gruposDar=agruparPorSeccion(puedoDar);
+  var gruposRecibir=agruparPorSeccion(puedoRecibir);
+
+  // Generar HTML del resultado
+  var html='';
+  var textoPlano='';
+  var fecha=new Date().toLocaleDateString('es-AR');
+
+  // LO QUE LE PUEDO DAR
+  html+='<div style="margin-bottom:16px">';
+  html+='<div style="font-family:Bebas Neue,cursive;font-size:1.1rem;color:#a78bfa;letter-spacing:2px;margin-bottom:8px">YO LE PUEDO DAR ('+puedoDar.length+')</div>';
+  textoPlano+='YO LE PUEDO DAR ('+puedoDar.length+')\n';
+  textoPlano+='Mundial 2026 - '+fecha+'\n\n';
+  if(!puedoDar.length){
+    html+='<p style="color:rgba(255,255,255,.4);font-size:.8rem">Ninguna de tus repetidas le faltan</p>';
+    textoPlano+='Ninguna\n';
+  } else {
+    Object.keys(gruposDar).forEach(function(sec){
+      html+='<div style="margin-bottom:6px">';
+      html+='<span style="color:var(--dorado);font-family:Barlow Condensed,sans-serif;font-size:.75rem;letter-spacing:1px;text-transform:uppercase">'+sec+'</span><br>';
+      html+='<span style="color:#fff;font-size:.82rem">'+gruposDar[sec].join(', ')+'</span>';
+      html+='</div>';
+      textoPlano+='['+sec+']\n'+gruposDar[sec].join(', ')+'\n\n';
+    });
+  }
+  html+='</div>';
+
+  // SEPARADOR
+  html+='<div style="border-top:1px solid rgba(255,255,255,.1);margin:12px 0"></div>';
+  textoPlano+='---\n\n';
+
+  // LO QUE ME PUEDE DAR
+  html+='<div>';
+  html+='<div style="font-family:Bebas Neue,cursive;font-size:1.1rem;color:#22a060;letter-spacing:2px;margin-bottom:8px">ME PUEDE DAR A MI ('+puedoRecibir.length+')</div>';
+  textoPlano+='ME PUEDE DAR A MI ('+puedoRecibir.length+')\n\n';
+  if(!puedoRecibir.length){
+    html+='<p style="color:rgba(255,255,255,.4);font-size:.8rem">Ninguna de sus figuritas te falta</p>';
+    textoPlano+='Ninguna\n';
+  } else {
+    Object.keys(gruposRecibir).forEach(function(sec){
+      html+='<div style="margin-bottom:6px">';
+      html+='<span style="color:var(--dorado);font-family:Barlow Condensed,sans-serif;font-size:.75rem;letter-spacing:1px;text-transform:uppercase">'+sec+'</span><br>';
+      html+='<span style="color:#fff;font-size:.82rem">'+gruposRecibir[sec].join(', ')+'</span>';
+      html+='</div>';
+      textoPlano+='['+sec+']\n'+gruposRecibir[sec].join(', ')+'\n\n';
+    });
+  }
+  html+='</div>';
+
+  textoResultado=textoPlano;
+  document.getElementById('comparar-contenido').innerHTML=html;
+  document.getElementById('comparar-paso1').style.display='none';
+  document.getElementById('comparar-resultado').style.display='block';
+}
+
+function copiarResultado(){
+  if(!textoResultado)return;
+  try{
+    navigator.clipboard.writeText(textoResultado).then(function(){
+      mostrarToast('Resultado copiado!');
+    }).catch(function(){copiarResultadoFallback();});
+  }catch(e){copiarResultadoFallback();}
+}
+function copiarResultadoFallback(){
+  var el=document.createElement('textarea');
+  el.value=textoResultado;
+  el.setAttribute('readonly','');
+  el.style.cssText='position:fixed;top:0;left:0;width:2em;height:2em;opacity:0;';
+  document.body.appendChild(el);
+  if(navigator.userAgent.match(/ipad|iphone/i)){
+    el.contentEditable=true;el.readOnly=false;
+    var range=document.createRange();
+    range.selectNodeContents(el);
+    var sel=window.getSelection();
+    sel.removeAllRanges();sel.addRange(range);
+    el.setSelectionRange(0,999999);
+  } else {el.select();}
+  try{document.execCommand('copy');mostrarToast('Resultado copiado!');}
+  catch(e){mostrarToast('No se pudo copiar');}
+  document.body.removeChild(el);
+}
 
 // COMPARTIR
 var textoCompartirActual='';
