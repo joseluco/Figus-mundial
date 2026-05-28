@@ -25,6 +25,7 @@
   .tab:hover{color:rgba(255,255,255,.7)}
   .tab.activo{color:var(--dorado);border-bottom-color:var(--dorado)}
   .tab.activo.tab-rep{color:#a78bfa;border-bottom-color:#7c3aed}
+  .tab.activo.tab-cmp{color:#e67e22;border-bottom-color:#e67e22}
   .controles{position:relative;z-index:10;display:flex;gap:8px;padding:12px 20px;flex-wrap:wrap;align-items:center;background:rgba(0,0,0,.2);border-bottom:1px solid rgba(255,255,255,.06)}
   .btn-accion{font-family:'Barlow Condensed',sans-serif;font-size:.78rem;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;padding:7px 13px;border:none;border-radius:4px;cursor:pointer;transition:all .15s;white-space:nowrap}
   .btn-accion:hover{transform:translateY(-1px);filter:brightness(1.1)}
@@ -114,8 +115,9 @@
   <div class="stat"><div class="stat-num violeta" id="cnt-rep">0</div><div class="stat-label">Repetidas</div></div>
 </div>
 <div class="tabs">
-  <div class="tab activo" data-tab="album" onclick="cambiarTab('album',this)">&#128203; Mi Album</div>
+  <div class="tab activo" data-tab="album" onclick="cambiarTab('album',this)">&#128203; Album</div>
   <div class="tab tab-rep" data-tab="repetidas" onclick="cambiarTab('repetidas',this)">&#128257; Repetidas</div>
+  <div class="tab tab-cmp" data-tab="comparar" onclick="cambiarTab('comparar',this)">&#128260; Comparar</div>
 </div>
 <!-- BARRA DE BUSQUEDA GLOBAL -->
 <div style="position:relative;z-index:10;padding:10px 20px;background:rgba(0,0,0,.35);border-bottom:1px solid rgba(255,255,255,.07);display:flex;gap:8px;align-items:center">
@@ -131,13 +133,18 @@
   </div>
   <button class="btn-accion btn-dorado" onclick="abrirModal()">+ Agregar</button>
   <button class="btn-accion btn-verde" onclick="abrirCompartir()">&#128288; Compartir</button>
-  <button class="btn-accion" style="background:#e67e22;color:#fff" onclick="abrirComparar()">&#128260; Comparar</button>
+
   <button class="btn-accion btn-azul" onclick="exportarDatos()">&#8595; Exportar</button>
   <button class="btn-accion btn-azul" onclick="abrirImportar()">&#8593; Importar</button>
 </div>
 <div class="controles" id="controles-rep" style="display:none">
   <button class="btn-accion btn-violeta" onclick="abrirModalRep()">+ Agregar repetida</button>
   <button class="btn-accion btn-rojo" onclick="eliminarDadas()">&#128465; Eliminar cambiadas</button>
+</div>
+<div class="controles" id="controles-cmp" style="display:none">
+  <button class="btn-accion" style="background:#e67e22;color:#fff" onclick="mostrarInputComparar()">&#128196; Pegar lista</button>
+  <button class="btn-accion btn-gris" onclick="limpiarComparar()" id="btn-limpiar-cmp" style="display:none">&#10005; Limpiar</button>
+  <button class="btn-accion btn-verde" onclick="copiarResultado()" id="btn-copiar-cmp" style="display:none">&#128203; Copiar resultado</button>
 </div>
 <div class="leyenda" id="leyenda-album">
   <div class="leyenda-item"><div class="leyenda-dot ld-falta"></div>Me falta</div>
@@ -147,9 +154,13 @@
   <div class="leyenda-item"><div class="leyenda-dot ld-rep"></div>Sin cambiar</div>
   <div class="leyenda-item"><div class="leyenda-dot ld-dada"></div>Ya la cambie</div>
 </div>
+<div class="leyenda" id="leyenda-cmp" style="display:none">
+  <div class="leyenda-item" style="color:#a78bfa">&#128260; Pega el texto que te mando la otra persona</div>
+</div>
 <div class="contenido">
   <div class="panel activo" id="panel-album"></div>
   <div class="panel" id="panel-repetidas"></div>
+  <div class="panel" id="panel-comparar"></div>
 </div>
 
 <!-- MODAL ALBUM -->
@@ -272,6 +283,17 @@
     </div>
   </div>
 </div>
+
+<!-- BOTON VOLVER ARRIBA -->
+<button id="btn-top" onclick="window.scrollTo({top:0,behavior:'smooth'})" style="
+  display:none;position:fixed;bottom:24px;right:20px;z-index:150;
+  width:44px;height:44px;border-radius:50%;border:none;
+  background:var(--dorado);color:var(--gris);
+  font-size:1.3rem;font-weight:bold;cursor:pointer;
+  box-shadow:0 4px 14px rgba(0,0,0,.5);
+  align-items:center;justify-content:center;
+  transition:opacity .3s;
+">&#8679;</button>
 
 <div class="toast" id="toast"></div>
 
@@ -869,10 +891,13 @@ function cambiarTab(tab,el){
   el.classList.add('activo');
   document.getElementById('controles-album').style.display=tab==='album'?'flex':'none';
   document.getElementById('controles-rep').style.display=tab==='repetidas'?'flex':'none';
+  document.getElementById('controles-cmp').style.display=tab==='comparar'?'flex':'none';
   document.getElementById('leyenda-album').style.display=tab==='album'?'flex':'none';
   document.getElementById('leyenda-rep').style.display=tab==='repetidas'?'flex':'none';
+  document.getElementById('leyenda-cmp').style.display=tab==='comparar'?'flex':'none';
   document.getElementById('panel-album').classList.toggle('activo',tab==='album');
   document.getElementById('panel-repetidas').classList.toggle('activo',tab==='repetidas');
+  document.getElementById('panel-comparar').classList.toggle('activo',tab==='comparar');
   render();
 }
 
@@ -1157,22 +1182,32 @@ function importarDatos(){
 document.getElementById('overlay-importar').addEventListener('click',function(e){if(e.target===document.getElementById('overlay-importar'))cerrarImportar();});
 
 // COMPARAR
-function abrirComparar(){
-  document.getElementById('overlay-comparar').classList.add('visible');
-  document.getElementById('comparar-paso1').style.display='block';
-  document.getElementById('comparar-resultado').style.display='none';
-  document.getElementById('comparar-texto').value='';
+function mostrarInputComparar(){
+  var panel=document.getElementById('panel-comparar');
+  panel.innerHTML='<div style="padding:8px 0">'
+    +'<p class="modal-desc" style="margin-bottom:10px">Pega el texto que te mando la otra persona:</p>'
+    +'<textarea id="comparar-texto" rows="8" style="width:100%;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.2);border-radius:6px;padding:10px;color:#fff;font-family:Barlow,sans-serif;font-size:.85rem;outline:none;resize:vertical" placeholder="Pega aca el texto recibido..."></textarea>'
+    +'<button class="btn-accion" style="background:#e67e22;color:#fff;width:100%;padding:12px;margin-top:10px;font-size:.9rem" onclick="procesarComparacion()">&#128260; Comparar</button>'
+    +'</div>';
+  document.getElementById('btn-limpiar-cmp').style.display='none';
+  document.getElementById('btn-copiar-cmp').style.display='none';
+  document.getElementById('leyenda-cmp').style.display='none';
+  setTimeout(function(){
+    var ta=document.getElementById('comparar-texto');
+    if(ta) ta.focus();
+  },100);
 }
-function cerrarComparar(){
-  document.getElementById('overlay-comparar').classList.remove('visible');
+function limpiarComparar(){
+  var panel=document.getElementById('panel-comparar');
+  panel.innerHTML='<div class="empty">&#128260; Toca "Pegar lista" para comparar figuritas</div>';
+  document.getElementById('btn-limpiar-cmp').style.display='none';
+  document.getElementById('btn-copiar-cmp').style.display='none';
+  document.getElementById('leyenda-cmp').style.display='flex';
 }
-function volverComparar(){
-  document.getElementById('comparar-paso1').style.display='block';
-  document.getElementById('comparar-resultado').style.display='none';
-}
-document.getElementById('overlay-comparar').addEventListener('click',function(e){
-  if(e.target===document.getElementById('overlay-comparar'))cerrarComparar();
-});
+// Mantener compatibilidad con el modal viejo (ya no se usa pero evita errores)
+function abrirComparar(){}
+function cerrarComparar(){}
+function volverComparar(){}
 
 // Limpiar emojis y caracteres especiales de un string
 function limpiarEmojis(str){
@@ -1307,9 +1342,12 @@ function procesarComparacion(){
     }
   }
   textoResultado=txt.join('\n');
-  document.getElementById('comparar-contenido').innerHTML=html;
-  document.getElementById('comparar-paso1').style.display='none';
-  document.getElementById('comparar-resultado').style.display='block';
+  var panel=document.getElementById('panel-comparar');
+  panel.innerHTML='<div style="padding:4px 0">'+html+'</div>';
+  document.getElementById('btn-limpiar-cmp').style.display='inline-flex';
+  document.getElementById('btn-copiar-cmp').style.display='inline-flex';
+  document.getElementById('leyenda-cmp').style.display='none';
+  window.scrollTo(0,0);
 }
 
 function copiarResultado(){
@@ -1437,6 +1475,17 @@ function copiarFallback(){
 document.getElementById('overlay-compartir').addEventListener('click',function(e){
   if(e.target===document.getElementById('overlay-compartir'))cerrarCompartir();
 });
+// VOLVER ARRIBA
+window.addEventListener('scroll',function(){
+  var btn=document.getElementById('btn-top');
+  if(!btn)return;
+  if(window.scrollY>300){
+    btn.style.display='flex';
+  } else {
+    btn.style.display='none';
+  }
+});
+
 var toastTimer;
 function mostrarToast(msg){var t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(function(){t.classList.remove('show');},2400);}
 
