@@ -1176,73 +1176,53 @@ document.getElementById('overlay-comparar').addEventListener('click',function(e)
 
 // Limpiar emojis y caracteres especiales de un string
 function limpiarEmojis(str){
-  // Remover caracteres no-ASCII (emojis, banderas, etc) - compatible con todos los browsers
-  var result='';
+  var r='';
   for(var i=0;i<str.length;i++){
-    var code=str.charCodeAt(i);
-    // Saltar surrogate pairs (emojis de banderas y otros)
-    if(code>=0xD800&&code<=0xDFFF){continue;}
-    // Solo mantener ASCII basico
-    if(code<=127){result+=str[i];}
+    var c=str.charCodeAt(i);
+    if(c>=0xD800&&c<=0xDFFF){i++;continue;}
+    if(c<=127) r+=str[i];
   }
-  return result.trim();
+  return r.trim();
 }
 
-// Parsear texto recibido en formato "PAIS emoji: num1, num2, num3"
-// o formato propio "[PAIS]\nnum1, num2"
 function extraerCodigos(texto){
   var codigos=[];
   var lineas=texto.split('\n');
-  var seccionActual=null;
-
-  lineas.forEach(function(linea){
-    var lineaLimpia=limpiarEmojis(linea).trim();
-    if(!lineaLimpia)return;
-
-    // Ignorar encabezados conocidos
-    var upper=lineaLimpia.toUpperCase();
-    if(upper.indexOf('FIGURITAS')!==-1||upper.indexOf('MUNDIAL')!==-1||
-       upper.indexOf('REPETIDAS')!==-1||upper.indexOf('FALTAN')!==-1||
-       upper.indexOf('LISTA')!==-1||upper.indexOf('USA')!==-1||
-       upper==='---'||upper.startsWith('ME PUEDE')||upper.startsWith('YO LE'))return;
-
-    // Detectar linea de seccion: "PAIS: num1, num2"
-    var matchSeccion=lineaLimpia.match(/^([A-Z]{2,5})\s*:\s*(.+)$/i);
-    if(matchSeccion){
-      var pais=matchSeccion[1].trim().toUpperCase();
-      var nums=matchSeccion[2];
-      // Extraer numeros y construir codigos completos
-      nums.split(',').forEach(function(n){
-        var num=n.trim();
-        if(num&&!isNaN(num)){
-          codigos.push(pais+' '+num);
+  var paisActual=null;
+  for(var li=0;li<lineas.length;li++){
+    var linea=limpiarEmojis(lineas[li]).trim();
+    if(!linea) continue;
+    var u=linea.toUpperCase();
+    if(u.indexOf('FIGURITAS')>=0||u.indexOf('MUNDIAL')>=0||u.indexOf('REPETIDAS')>=0||
+       u.indexOf('FALTAN')>=0||u.indexOf('LISTA')>=0||u==='---') continue;
+    // Formato "PAI: 1, 2, 3"
+    var idx=linea.indexOf(':');
+    if(idx>0&&idx<=5){
+      var pais=linea.substring(0,idx).trim().toUpperCase();
+      if(/^[A-Z]{2,5}$/.test(pais)){
+        paisActual=pais;
+        var nums=linea.substring(idx+1).split(',');
+        for(var ni=0;ni<nums.length;ni++){
+          var n=nums[ni].trim();
+          if(n&&!isNaN(n)) codigos.push(pais+' '+n);
         }
-      });
-      seccionActual=pais;
-      return;
-    }
-
-    // Linea tipo "[PAIS]"
-    var matchBracket=lineaLimpia.match(/^\[([^\]]+)\]$/);
-    if(matchBracket){
-      seccionActual=matchBracket[1].trim().toUpperCase();
-      return;
-    }
-
-    // Linea solo de numeros (pertenece a seccion anterior)
-    if(seccionActual){
-      var soloNums=lineaLimpia.replace(/[^0-9,\s]/g,'').trim();
-      if(soloNums){
-        soloNums.split(',').forEach(function(n){
-          var num=n.trim();
-          if(num&&!isNaN(num)){
-            codigos.push(seccionActual+' '+num);
-          }
-        });
+        continue;
       }
     }
-  });
-
+    // Formato "[PAIS]"
+    if(linea.charAt(0)==='['&&linea.charAt(linea.length-1)===']'){
+      paisActual=linea.substring(1,linea.length-1).trim().toUpperCase();
+      continue;
+    }
+    // Solo numeros (de seccion previa)
+    if(paisActual){
+      var nums=linea.replace(/[^0-9,]/g,'').split(',');
+      for(var ni=0;ni<nums.length;ni++){
+        var n=nums[ni].trim();
+        if(n&&!isNaN(n)) codigos.push(paisActual+' '+n);
+      }
+    }
+  }
   return codigos;
 }
 
@@ -1252,36 +1232,51 @@ function procesarComparacion(){
   var textoOtro=document.getElementById('comparar-texto').value.trim();
   if(!textoOtro){mostrarToast('Pega primero el texto recibido');return;}
   var codigosOtro=extraerCodigos(textoOtro);
-  if(!codigosOtro.length){mostrarToast('No se encontraron codigos en el texto');return;}
-  var misRepetidas=[];
-  for(var i=0;i<estado.repetidas.length;i++) misRepetidas.push(estado.repetidas[i].n.toUpperCase());
-  var misFaltantes=[];
-  for(var i=0;i<estado.secciones.length;i++){
-    var sec=estado.secciones[i];
-    for(var j=0;j<sec.figs.length;j++) if(!sec.figs[j].tengo) misFaltantes.push(sec.figs[j].n.toUpperCase());
+  if(!codigosOtro.length){mostrarToast('No se encontraron codigos');return;}
+  // Mis repetidas como objeto para busqueda rapida O(1)
+  var mapRepetidas={};
+  for(var i=0;i<estado.repetidas.length;i++){
+    mapRepetidas[estado.repetidas[i].n.toUpperCase()]=true;
   }
-  var puedoDar=[];
-  for(var i=0;i<misRepetidas.length;i++) for(var j=0;j<codigosOtro.length;j++) if(misRepetidas[i]===codigosOtro[j]){puedoDar.push(misRepetidas[i]);break;}
-  var puedoRecibir=[];
-  for(var i=0;i<codigosOtro.length;i++) for(var j=0;j<misFaltantes.length;j++) if(codigosOtro[i]===misFaltantes[j]){puedoRecibir.push(codigosOtro[i]);break;}
-  function agrupar(lista){
-    var grupos={};var orden=[];
-    for(var i=0;i<lista.length;i++){
-      var cod=lista[i];var pais=cod.indexOf(' ')>0?cod.split(' ')[0]:cod;
-      if(!grupos[pais]){grupos[pais]=[];orden.push(pais);}
-      grupos[pais].push(cod);
+  // Mis faltantes como objeto O(1)
+  var mapFaltantes={};
+  for(var i=0;i<estado.secciones.length;i++){
+    for(var j=0;j<estado.secciones[i].figs.length;j++){
+      if(!estado.secciones[i].figs[j].tengo){
+        mapFaltantes[estado.secciones[i].figs[j].n.toUpperCase()]=true;
+      }
     }
-    return {g:grupos,o:orden};
+  }
+  // Cruces simples
+  var puedoDar=[];
+  var puedoRecibir=[];
+  for(var i=0;i<codigosOtro.length;i++){
+    var cod=codigosOtro[i];
+    if(mapRepetidas[cod]) puedoDar.push(cod);
+    if(mapFaltantes[cod]) puedoRecibir.push(cod);
+  }
+  // Agrupar por pais
+  function agrupar(lista){
+    var g={};var o=[];
+    for(var i=0;i<lista.length;i++){
+      var cod=lista[i];
+      var sp=cod.indexOf(' ');
+      var pais=sp>0?cod.substring(0,sp):cod;
+      var num=sp>0?cod.substring(sp+1):cod;
+      if(!g[pais]){g[pais]=[];o.push(pais);}
+      g[pais].push(num);
+    }
+    return {g:g,o:o};
   }
   var agDar=agrupar(puedoDar);
   var agRec=agrupar(puedoRecibir);
-  var fecha=new Date().toLocaleDateString('es-AR');
+  // Construir HTML y texto
   var html='';
   var txt=[];
-  html+='<div style="margin-bottom:14px">';
-  html+='<div style="font-family:Bebas Neue,cursive;font-size:1.1rem;color:#a78bfa;letter-spacing:2px;margin-bottom:8px">YO LE PUEDO DAR ('+puedoDar.length+')</div>';
+  var fecha=new Date().toLocaleDateString('es-AR');
+  // DAR
+  html+='<p style="font-family:Bebas Neue,cursive;font-size:1.1rem;color:#a78bfa;letter-spacing:2px;margin-bottom:8px">YO LE PUEDO DAR ('+puedoDar.length+')</p>';
   txt.push('YO LE PUEDO DAR ('+puedoDar.length+')');
-  txt.push('Mundial 2026 - '+fecha);
   txt.push('');
   if(!puedoDar.length){
     html+='<p style="color:rgba(255,255,255,.4);font-size:.82rem">Ninguna de tus repetidas le faltan</p>';
@@ -1289,18 +1284,15 @@ function procesarComparacion(){
   } else {
     for(var i=0;i<agDar.o.length;i++){
       var p=agDar.o[i];
-      var nums=agDar.g[p].map(function(c){return c.indexOf(' ')>0?c.substring(c.indexOf(' ')+1):c;}).join(', ');
-      html+='<div style="margin-bottom:5px"><span style="color:var(--dorado);font-family:Barlow Condensed,sans-serif;font-size:.75rem;letter-spacing:1px">'+p+'</span> <span style="color:#fff;font-size:.82rem">'+nums+'</span></div>';
-      txt.push('['+p+']: '+agDar.g[p].join(', '));
+      var ns=agDar.g[p].join(', ');
+      html+='<p style="margin-bottom:4px"><b style="color:var(--dorado)">'+p+'</b> <span style="color:#fff;font-size:.85rem">'+ns+'</span></p>';
+      txt.push(p+': '+ns);
     }
-    txt.push('');
   }
-  html+='</div>';
-  html+='<div style="border-top:1px solid rgba(255,255,255,.1);margin:10px 0"></div>';
-  txt.push('---');
-  txt.push('');
-  html+='<div>';
-  html+='<div style="font-family:Bebas Neue,cursive;font-size:1.1rem;color:#22a060;letter-spacing:2px;margin-bottom:8px">ME PUEDE DAR A MI ('+puedoRecibir.length+')</div>';
+  html+='<hr style="border-color:rgba(255,255,255,.1);margin:10px 0">';
+  txt.push('');txt.push('---');txt.push('');
+  // RECIBIR
+  html+='<p style="font-family:Bebas Neue,cursive;font-size:1.1rem;color:#22a060;letter-spacing:2px;margin-bottom:8px">ME PUEDE DAR A MI ('+puedoRecibir.length+')</p>';
   txt.push('ME PUEDE DAR A MI ('+puedoRecibir.length+')');
   txt.push('');
   if(!puedoRecibir.length){
@@ -1309,12 +1301,11 @@ function procesarComparacion(){
   } else {
     for(var i=0;i<agRec.o.length;i++){
       var p=agRec.o[i];
-      var nums=agRec.g[p].map(function(c){return c.indexOf(' ')>0?c.substring(c.indexOf(' ')+1):c;}).join(', ');
-      html+='<div style="margin-bottom:5px"><span style="color:var(--dorado);font-family:Barlow Condensed,sans-serif;font-size:.75rem;letter-spacing:1px">'+p+'</span> <span style="color:#fff;font-size:.82rem">'+nums+'</span></div>';
-      txt.push('['+p+']: '+agRec.g[p].join(', '));
+      var ns=agRec.g[p].join(', ');
+      html+='<p style="margin-bottom:4px"><b style="color:var(--dorado)">'+p+'</b> <span style="color:#fff;font-size:.85rem">'+ns+'</span></p>';
+      txt.push(p+': '+ns);
     }
   }
-  html+='</div>';
   textoResultado=txt.join('\n');
   document.getElementById('comparar-contenido').innerHTML=html;
   document.getElementById('comparar-paso1').style.display='none';
@@ -1326,9 +1317,10 @@ function copiarResultado(){
   try{
     navigator.clipboard.writeText(textoResultado).then(function(){
       mostrarToast('Resultado copiado!');
-    }).catch(function(){copiarResultadoFallback();});
+    }).catch(copiarResultadoFallback);
   }catch(e){copiarResultadoFallback();}
 }
+
 function copiarResultadoFallback(){
   var el=document.createElement('textarea');
   el.value=textoResultado;
