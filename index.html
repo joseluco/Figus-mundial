@@ -70,7 +70,31 @@
   .btn-menos{position:absolute;top:-7px;right:-7px;width:20px;height:20px;background:#f5c842;color:#333;border:2px solid #0f2617;border-radius:50%;font-size:.9rem;font-weight:bold;cursor:pointer;display:flex;align-items:center;justify-content:center;opacity:0;transition:opacity .15s;z-index:5;box-shadow:0 2px 6px rgba(0,0,0,.5);line-height:1}
   .btn-menos:hover{background:#e0b030;transform:scale(1.1)}
   .figurita:hover .btn-menos{opacity:1}
-  @media(max-width:480px){.btn-eliminar{opacity:1}.btn-menos{opacity:1}}
+  @media(max-width:600px){
+    header{padding:12px 16px 10px}
+    header h1{font-size:1.5rem}
+    .stats-bar{gap:14px;padding:10px 12px}
+    .stat-num{font-size:1.6rem}
+    .stat-label{font-size:.6rem}
+    .controles{padding:10px 12px;gap:6px}
+    .btn-accion{font-size:.72rem;padding:6px 10px}
+    .contenido{padding:12px 12px}
+    .figurita{width:50px;height:64px}
+    .fig-numero{font-size:.95rem}
+    .fig-nombre{font-size:.38rem}
+    .btn-eliminar{opacity:1}
+    .btn-menos{opacity:1}
+    .modal{padding:20px}
+    .seccion-titulo{font-size:1.1rem}
+    .tab{font-size:.72rem;padding:10px 6px}
+    #btn-top{bottom:16px;right:14px;width:40px;height:40px;font-size:1.1rem}
+  }
+  @media(max-width:380px){
+    .figurita{width:44px;height:58px}
+    .fig-numero{font-size:.85rem}
+    .btn-accion{font-size:.65rem;padding:5px 7px}
+    .stats-bar{gap:10px}
+  }
   .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.78);z-index:100;align-items:center;justify-content:center;padding:20px}
   .overlay.visible{display:flex}
   .modal{background:#1c3d2a;border:2px solid var(--dorado);border-radius:12px;padding:28px;max-width:420px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.7);animation:slideUp .2s ease}
@@ -133,6 +157,7 @@
   </div>
   <button class="btn-accion btn-dorado" onclick="abrirModal()">+ Agregar</button>
   <button class="btn-accion btn-verde" onclick="abrirCompartir()">&#128288; Compartir</button>
+  <button class="btn-accion btn-rojo" onclick="pedirEliminarTengo()" id="btn-elim-tengo" style="display:none">&#128465; Eliminar marcadas</button>
 
   <button class="btn-accion btn-azul" onclick="exportarDatos()">&#8595; Exportar</button>
   <button class="btn-accion btn-azul" onclick="abrirImportar()">&#8593; Importar</button>
@@ -416,18 +441,7 @@ var DATOS_INICIALES={secciones:[
     {n:"MAR 17",t:"Amine Szejalouli",tengo:true},{n:"MAR 19",t:"Brahim Diaz",tengo:false},
     {n:"MAR 20",t:"Ayoub El Kaabi",tengo:false}
   ]},
-  {nombre:"Escocia",figs:[
-    {n:"SCO 1",t:"Escudo",tengo:false},{n:"SCO 2",t:"",tengo:true},
-    {n:"SCO 3",t:"Jon Hendry",tengo:false},{n:"SCO 4",t:"Kieran Tierney",tengo:false},
-    {n:"SCO 6",t:"Andrew Robertson",tengo:true},{n:"SCO 7",t:"Scott McLenna",tengo:false},
-    {n:"SCO 8",t:"John Souttar",tengo:true},{n:"SCO 9",t:"Anthony Ralston",tengo:false},
-    {n:"SCO 11",t:"Scott McTominay",tengo:false},{n:"SCO 12",t:"Billy Gilmour",tengo:false},
-    {n:"SCO 13",t:"",tengo:false},{n:"SCO 14",t:"Lewis Ferguson",tengo:false},
-    {n:"SCO 15",t:"",tengo:true},{n:"SCO 16",t:"Kenny McLean",tengo:false},
-    {n:"SCO 17",t:"John McGinn",tengo:false},{n:"SCO 18",t:"Windon Dykes",tengo:true},
-    {n:"SCO 20",t:"Ben Doak",tengo:false}
-  ]}
-,  {nombre:"Haiti",figs:[
+  {nombre:"Haiti",figs:[
     {n:"HAI 1",t:"Johy Placide",tengo:true},{n:"HAI 3",t:"Carlens Arcus",tengo:false},
     {n:"HAI 4",t:"Martin Experience",tengo:false},{n:"HAI 5",t:"Jean-Kevin Duverne",tengo:false},
     {n:"HAI 6",t:"Ricardo Ade",tengo:false},{n:"HAI 7",t:"Duke Lacroix",tengo:false},
@@ -437,6 +451,17 @@ var DATOS_INICIALES={secciones:[
     {n:"HAI 15",t:"Derrick Etienne Jr",tengo:false},{n:"HAI 16",t:"Ruben Providence",tengo:true},
     {n:"HAI 17",t:"Josue Casimir",tengo:false},{n:"HAI 18",t:"Duckens Nazon",tengo:false},
     {n:"HAI 19",t:"Louicius Deedson",tengo:false},{n:"HAI 20",t:"Frantzdy Pierrot",tengo:false}
+  ]}
+,  {nombre:"Escocia",figs:[
+    {n:"SCO 1",t:"Escudo",tengo:false},{n:"SCO 2",t:"",tengo:true},
+    {n:"SCO 3",t:"Jon Hendry",tengo:false},{n:"SCO 4",t:"Kieran Tierney",tengo:false},
+    {n:"SCO 6",t:"Andrew Robertson",tengo:true},{n:"SCO 7",t:"Scott McLenna",tengo:false},
+    {n:"SCO 8",t:"John Souttar",tengo:true},{n:"SCO 9",t:"Anthony Ralston",tengo:false},
+    {n:"SCO 11",t:"Scott McTominay",tengo:false},{n:"SCO 12",t:"Billy Gilmour",tengo:false},
+    {n:"SCO 13",t:"",tengo:false},{n:"SCO 14",t:"Lewis Ferguson",tengo:false},
+    {n:"SCO 15",t:"",tengo:true},{n:"SCO 16",t:"Kenny McLean",tengo:false},
+    {n:"SCO 17",t:"John McGinn",tengo:false},{n:"SCO 18",t:"Windon Dykes",tengo:true},
+    {n:"SCO 20",t:"Ben Doak",tengo:false}
   ]},
   {nombre:"USA",figs:[
     {n:"USA 1",t:"Escudo",tengo:false},{n:"USA 3",t:"",tengo:true},
@@ -903,7 +928,10 @@ function cambiarTab(tab,el){
 
 function setFiltro(el,f){
   document.querySelectorAll('.filtro').forEach(function(b){b.classList.remove('activo');});
-  el.classList.add('activo');filtroActual=f;render();
+  el.classList.add('activo');filtroActual=f;
+  var btnElim=document.getElementById('btn-elim-tengo');
+  if(btnElim) btnElim.style.display=f==='tengo'?'inline-flex':'none';
+  render();
 }
 
 var buscarEl=document.getElementById('buscar-global');
@@ -921,10 +949,23 @@ function limpiarBusqueda(){
 
 function render(){renderAlbum();renderRepetidas();renderStats();}
 
+function sortFigs(figs){
+  return figs.slice().sort(function(a,b){
+    var na=a.n, nb=b.n;
+    var pa=na.lastIndexOf(' '), pb=nb.lastIndexOf(' ');
+    var prefA=pa>=0?na.substring(0,pa):na;
+    var prefB=pb>=0?nb.substring(0,pb):nb;
+    if(prefA!==prefB) return prefA.localeCompare(prefB);
+    var numA=pa>=0?parseInt(na.substring(pa+1))||0:0;
+    var numB=pb>=0?parseInt(nb.substring(pb+1))||0:0;
+    return numA-numB;
+  });
+}
 function renderAlbum(){
   var panel=document.getElementById('panel-album');panel.innerHTML='';var hayAlgo=false;
   estado.secciones.forEach(function(sec){
-    var figs=sec.figs.filter(function(f){
+    var figs=sortFigs(sec.figs.filter(function(f){
+
       // Busqueda: por numero (ej "URU 10"), por prefijo (ej "URU"), por nombre jugador, por nombre seccion
 var codPrefix=String(f.n).split(' ')[0].toLowerCase();
 var mb=busqueda===''
@@ -935,7 +976,7 @@ var mb=busqueda===''
   ||codPrefix.includes(busqueda);
       var mf=filtroActual==='todas'||(filtroActual==='falta'&&!f.tengo)||(filtroActual==='tengo'&&f.tengo);
       return mb&&mf;
-    });
+    }));
     if(!figs.length)return;hayAlgo=true;
     var secDiv=document.createElement('div');secDiv.className='seccion';
     secDiv.innerHTML='<div class="seccion-titulo">'+sec.nombre+'<span class="seccion-count">'+figs.length+' fig.</span></div><div class="grid"></div>';
@@ -1066,14 +1107,47 @@ function eliminarDadas(){
   mostrarToast(restadas>0?restadas+' repetida(s) restada(s)':'No hay cambiadas para eliminar');
 }
 
+function pedirEliminarTengo(){
+  var total=0;
+  estado.secciones.forEach(function(s){
+    total+=s.figs.filter(function(f){return f.tengo;}).length;
+  });
+  if(!total){mostrarToast('No hay figuritas marcadas como tengo');return;}
+  pendienteEliminarTengo=true;
+  document.getElementById('confirm-nombre').textContent=total+' figuritas. Se borran del listado definitivamente';
+  document.getElementById('overlay-confirm').classList.add('visible');
+}
+
+var pendienteEliminarTengo=false;
 var pendienteEliminar=null;
 function pedirConfirmacion(tipo,secNombre,num,nombre){
   pendienteEliminar={tipo:tipo,secNombre:secNombre,num:num};
   document.getElementById('confirm-nombre').textContent=num+' '+nombre;
   document.getElementById('overlay-confirm').classList.add('visible');
 }
-function cerrarConfirm(){pendienteEliminar=null;document.getElementById('overlay-confirm').classList.remove('visible');}
+function cerrarConfirm(){pendienteEliminar=null;pendienteEliminarTengo=false;document.getElementById('overlay-confirm').classList.remove('visible');}
 function confirmarEliminar(){
+  if(pendienteEliminarTengo){
+    // Eliminar definitivamente las que tengo del listado
+    var eliminadas=0;
+    estado.secciones.forEach(function(s){
+      var antes=s.figs.length;
+      s.figs=s.figs.filter(function(f){return!f.tengo;});
+      eliminadas+=antes-s.figs.length;
+    });
+    // Eliminar secciones vacías
+    estado.secciones=estado.secciones.filter(function(s){return s.figs.length>0;});
+    pendienteEliminarTengo=false;
+    guardarDatos();cerrarConfirm();
+    // Volver a filtro "todas" y ocultar botón
+    document.querySelectorAll('.filtro').forEach(function(b){b.classList.remove('activo');});
+    document.querySelectorAll('.filtro')[0].classList.add('activo');
+    filtroActual='todas';
+    document.getElementById('btn-elim-tengo').style.display='none';
+    render();
+    mostrarToast('&#128465; '+eliminadas+' figurita(s) eliminadas del listado');
+    return;
+  }
   if(!pendienteEliminar)return;
   var tipo=pendienteEliminar.tipo,secNombre=pendienteEliminar.secNombre,num=pendienteEliminar.num;
   if(tipo==='album'){
