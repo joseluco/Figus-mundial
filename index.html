@@ -322,55 +322,37 @@
 
 <div class="toast" id="toast"></div>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-app.js";
-import { getDatabase, ref, set, get, onValue } from "https://www.gstatic.com/firebasejs/11.0.0/firebase-database.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyBHGQtnfMBQ7oRSNzwZJU_4MOZljx4wTB0",
-  authDomain: "figus-mundial-d49cf.firebaseapp.com",
-  databaseURL: "https://figus-mundial-d49cf-default-rtdb.firebaseio.com",
-  projectId: "figus-mundial-d49cf",
-  storageBucket: "figus-mundial-d49cf.firebasestorage.app",
-  messagingSenderId: "395962609740",
-  appId: "1:395962609740:web:fae94202dbb34ec86544e9"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getDatabase(app);
-const DB_REF = 'usuario/datos';
-
-window.fbGuardar = function(estado) {
-  try {
-    set(ref(db, DB_REF), JSON.stringify(estado));
-  } catch(e) {}
-};
-
-window.fbCargar = function(callback) {
-  try {
-    get(ref(db, DB_REF)).then(function(snapshot) {
-      if (snapshot.exists()) {
-        try {
-          var d = JSON.parse(snapshot.val());
-          if (d && d.secciones) callback(d);
-        } catch(e) {}
-      }
-    }).catch(function(){});
-  } catch(e) {}
-};
-
-window.fbEscuchar = function(callback) {
-  try {
-    onValue(ref(db, DB_REF), function(snapshot) {
-      if (snapshot.exists()) {
-        try {
-          var d = JSON.parse(snapshot.val());
-          if (d && d.secciones) callback(d);
-        } catch(e) {}
-      }
-    });
-  } catch(e) {}
-};
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<script>
+(function(){
+  var firebaseConfig={
+    apiKey:"AIzaSyBHGQtnfMBQ7oRSNzwZJU_4MOZljx4wTB0",
+    authDomain:"figus-mundial-d49cf.firebaseapp.com",
+    databaseURL:"https://figus-mundial-d49cf-default-rtdb.firebaseio.com",
+    projectId:"figus-mundial-d49cf",
+    storageBucket:"figus-mundial-d49cf.firebasestorage.app",
+    messagingSenderId:"395962609740",
+    appId:"1:395962609740:web:fae94202dbb34ec86544e9"
+  };
+  try{
+    firebase.initializeApp(firebaseConfig);
+    var db=firebase.database();
+    var DB_REF='usuario/datos';
+    window.fbGuardar=function(estado){
+      try{db.ref(DB_REF).set(JSON.stringify(estado));}catch(e){}
+    };
+    window.fbCargar=function(callback){
+      try{
+        db.ref(DB_REF).once('value').then(function(snap){
+          if(snap.exists()){
+            try{var d=JSON.parse(snap.val());if(d&&d.secciones)callback(d);}catch(e){}
+          }
+        }).catch(function(){});
+      }catch(e){}
+    };
+  }catch(e){console.log('Firebase error:',e);}
+})();
 </script>
 
 <script>
@@ -1474,13 +1456,39 @@ function procesarComparacion(){
         mapMisFalt[norm(estado.secciones[i].figs[j].n)]=true;
 
   // CRUCE 1: mis repetidas que estan en sus FALTANTES -> yo le puedo dar
+  // Iterar mis repetidas (no las secciones del album)
   var puedoDar=[];
-  for(var i=0;i<estado.secciones.length;i++){
-    var sec=estado.secciones[i];
-    for(var j=0;j<sec.figs.length;j++){
-      var cod=norm(sec.figs[j].n);
-      if(mapMisRep[cod]&&mapSusFaltan[cod])
-        puedoDar.push({sec:sec.nombre,n:sec.figs[j].n});
+  // Para mantener orden del album, primero construir mapa seccion->repetidas
+  for(var si=0;si<estado.secciones.length;si++){
+    var sec=estado.secciones[si];
+    // Ver qué repetidas pertenecen a esta seccion (por prefijo o por estar en figs)
+    var prefijosSec={};
+    for(var fi=0;fi<sec.figs.length;fi++) prefijosSec[norm(sec.figs[fi].n)]=true;
+    for(var ri=0;ri<estado.repetidas.length;ri++){
+      var r=estado.repetidas[ri];
+      if(r.dada) continue;
+      var codR=norm(r.n);
+      // Verificar si esta repetida pertenece a esta seccion
+      var enSeccion=prefijosSec[codR];
+      if(!enSeccion){
+        // Verificar por prefijo
+        var prefR=r.n.split(' ')[0].toUpperCase();
+        var prefSec=sec.figs.length>0?sec.figs[0].n.split(' ')[0].toUpperCase():'';
+        enSeccion=(prefR===prefSec);
+      }
+      if(enSeccion&&mapSusFaltan[codR]){
+        puedoDar.push({sec:sec.nombre,n:r.n});
+      }
+    }
+  }
+  // Repetidas que no matchearon ninguna seccion
+  for(var ri=0;ri<estado.repetidas.length;ri++){
+    var r=estado.repetidas[ri];
+    if(r.dada) continue;
+    var codR=norm(r.n);
+    var yaEsta=puedoDar.some(function(x){return norm(x.n)===codR;});
+    if(!yaEsta&&mapSusFaltan[codR]){
+      puedoDar.push({sec:'Otras',n:r.n});
     }
   }
 
@@ -1632,30 +1640,25 @@ function generarTexto(modo){
       lineas.push('No tengo repetidas');
       lineas.push('');
     } else {
-      // Ordenar repetidas en el mismo orden del album
-      var repsOrdenadas=[];
+      // Ordenar repetidas segun orden del album (por prefijo de seccion)
+      var ordenPrefijos={};
       for(var si=0;si<estado.secciones.length;si++){
-        var sec=estado.secciones[si];
-        var prefijos={};
-        for(var fi=0;fi<sec.figs.length;fi++){
-          prefijos[sec.figs[fi].n.toUpperCase()]=true;
-        }
-        for(var ri=0;ri<estado.repetidas.length;ri++){
-          var r=estado.repetidas[ri];
-          if(prefijos[r.n.toUpperCase()]){
-            repsOrdenadas.push(r);
-          }
+        if(estado.secciones[si].figs.length>0){
+          var pref=estado.secciones[si].figs[0].n.split(' ')[0].toUpperCase();
+          if(!ordenPrefijos[pref]) ordenPrefijos[pref]=si;
         }
       }
-      // Las que no matchean ninguna seccion al final
-      for(var ri=0;ri<estado.repetidas.length;ri++){
-        var r=estado.repetidas[ri];
-        var yaEsta=false;
-        for(var k=0;k<repsOrdenadas.length;k++){
-          if(repsOrdenadas[k].n===r.n){yaEsta=true;break;}
-        }
-        if(!yaEsta) repsOrdenadas.push(r);
-      }
+      var repsOrdenadas=estado.repetidas.slice().sort(function(a,b){
+        var pA=a.n.split(' ')[0].toUpperCase();
+        var pB=b.n.split(' ')[0].toUpperCase();
+        var oA=ordenPrefijos[pA]!==undefined?ordenPrefijos[pA]:999;
+        var oB=ordenPrefijos[pB]!==undefined?ordenPrefijos[pB]:999;
+        if(oA!==oB) return oA-oB;
+        // Mismo prefijo: ordenar por numero
+        var nA=parseInt(a.n.split(' ')[1])||0;
+        var nB=parseInt(b.n.split(' ')[1])||0;
+        return nA-nB;
+      });
       repsOrdenadas.forEach(function(r){
         lineas.push(r.n);
       });
